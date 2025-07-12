@@ -6,6 +6,7 @@ class AdvancedCalculator extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'Advanced Calculator',
+    home: Screen(),
     debugShowCheckedModeBanner: false,
   );
 }
@@ -15,6 +16,8 @@ class Screen extends StatefulWidget {
   _ScreenState createState() => _ScreenState();
 }
 class _ScreenState extends State<Screen> {
+  String display = '';
+
   @override
   Widget build(BuildContext context) => Scaffold();
 }
