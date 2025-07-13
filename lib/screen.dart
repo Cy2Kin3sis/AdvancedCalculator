@@ -11,30 +11,26 @@ class ScreenState extends State<Screen> {
   String _expression = '';
   String _result = '';
   final Map<String, double> _variables = {'x': 0, 'y': 0, 'z': 0};
-  final Color ch = Colors.white;
+  final Color ch = Colors.black54;
 
   final ShuntingYardParser _parser = ShuntingYardParser();
   final ContextModel _contextModel = ContextModel();
 
-  void _onPressed(String value) {
-    setState(() {
-      if (value == 'CE') {
-        _expression = '';
-        _result = '';
-      } else if (value == 'C') {
-        if (_expression.isNotEmpty) {
-          _expression = _expression.substring(0, _expression.length - 1);
-        }
-      } else if (value == '=') {
-        _evaluateExpression();
-      } else if (value == '→x' || value == '→y' || value == '→z') {
-        final variable = value.substring(1); // Get 'x', 'y', or 'z'
-        _assignToVariable(variable);
-      } else {
-        _expression += value;
-      }
-    });
-  }
+  void _onPressed(String value) => setState(() {
+    if (value == 'CE') {
+      _expression = '';
+      _result = '';
+    } else if (value == 'C') {
+      if (_expression.isNotEmpty) _expression = _expression.substring(0, _expression.length - 1);
+    } else if (value == '=') {
+      _evaluateExpression();
+    } else if (value == '→x' || value == '→y' || value == '→z') {
+      final variable = value.substring(1); // Get 'x', 'y', or 'z'
+      _assignToVariable(variable);
+    } else {
+      _expression += value;
+    }
+  });
 
   // Add this method to preprocess expressions for implicit multiplication
   String _preprocessExpression(String expr) {
@@ -114,21 +110,18 @@ class ScreenState extends State<Screen> {
           ),
           child: Text(
             label,
-            style: const TextStyle(fontSize: 20),
+            style: const TextStyle(fontSize: 20, color: Colors.white),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildRow(List<String> labels, {List<Color>? colors}) {
-    return Row(
-      children: List.generate(
-        labels.length,
-            (i) => _buildButton(labels[i], color: colors != null ? colors[i] : Colors.grey),
-      ),
-    );
-  }
+  Widget _buildRow(List<String> labels, {List<Color>? colors}) => Row(
+    children: List.generate(
+      labels.length, (i) => _buildButton(labels[i], color: colors != null ? colors[i] : Colors.grey),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
