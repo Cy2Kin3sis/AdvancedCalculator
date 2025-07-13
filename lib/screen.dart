@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:math_expressions/math_expressions.dart';
 
@@ -11,7 +13,7 @@ class ScreenState extends State<Screen> {
   String _expression = '';
   String _result = '';
   final Map<String, double> _variables = {'x': 0, 'y': 0, 'z': 0};
-  final Color ch = Colors.black54;
+  final Color ch = Colors.black87;
 
   final ShuntingYardParser _parser = ShuntingYardParser();
   final ContextModel _contextModel = ContextModel();
@@ -21,7 +23,9 @@ class ScreenState extends State<Screen> {
       _expression = '';
       _result = '';
     } else if (value == 'C') {
-      if (_expression.isNotEmpty) _expression = _expression.substring(0, _expression.length - 1);
+      if (_expression.isNotEmpty) {
+        _expression = _expression.substring(0, _expression.length - 1);
+      }
     } else if (value == '=') {
       _evaluateExpression();
     } else if (value == '→x' || value == '→y' || value == '→z') {
@@ -38,21 +42,39 @@ class ScreenState extends State<Screen> {
     expr = expr.replaceAll('×', '*');
     expr = expr.replaceAll('÷', '/');
 
+    // Handle percentage conversion (e.g., "50%" becomes "50/100", "x%" becomes "x/100")
+    expr = expr.replaceAllMapped(RegExp(r'([0-9.]+|[xyz])\s*%'), (match) => '(${match.group(1)}/100)');
+
     // Handle implicit multiplication patterns
     // Pattern 1: number followed by variable (e.g., "4x", "2.5y")
-    expr = expr.replaceAllMapped(RegExp(r'(\d+\.?\d*)\s*([xyz])'), (match) => '${match.group(1)}*${match.group(2)}');
+    expr = expr.replaceAllMapped(
+      RegExp(r'(\d+\.?\d*)\s*([xyz])'),
+          (match) => '${match.group(1)}*${match.group(2)}',
+    );
 
     // Pattern 2: variable followed by number (e.g., "x4", "y2.5")
-    expr = expr.replaceAllMapped(RegExp(r'([xyz])\s*(\d+\.?\d*)'), (match) => '${match.group(1)}*${match.group(2)}');
+    expr = expr.replaceAllMapped(
+      RegExp(r'([xyz])\s*(\d+\.?\d*)'),
+          (match) => '${match.group(1)}*${match.group(2)}',
+    );
 
     // Pattern 3: variable followed by variable (e.g., "xy", "xz")
-    expr = expr.replaceAllMapped(RegExp(r'([xyz])\s*([xyz])'), (match) => '${match.group(1)}*${match.group(2)}');
+    expr = expr.replaceAllMapped(
+      RegExp(r'([xyz])\s*([xyz])'),
+          (match) => '${match.group(1)}*${match.group(2)}',
+    );
 
     // Pattern 4: number/variable followed by opening parenthesis
-    expr = expr.replaceAllMapped(RegExp(r'(\d+\.?\d*|[xyz])\s*\('), (match) => '${match.group(1)}*(');
+    expr = expr.replaceAllMapped(
+      RegExp(r'(\d+\.?\d*|[xyz])\s*\('),
+          (match) => '${match.group(1)}*(',
+    );
 
     // Pattern 5: closing parenthesis followed by number/variable
-    expr = expr.replaceAllMapped(RegExp(r'\)\s*(\d+\.?\d*|[xyz])'), (match) => ')*${match.group(1)}');
+    expr = expr.replaceAllMapped(
+      RegExp(r'\)\s*(\d+\.?\d*|[xyz])'),
+          (match) => ')*${match.group(1)}',
+    );
 
     return expr;
   }
@@ -62,11 +84,28 @@ class ScreenState extends State<Screen> {
     _contextModel.bindVariable(Variable('x'), Number(_variables['x']!));
     _contextModel.bindVariable(Variable('y'), Number(_variables['y']!));
     _contextModel.bindVariable(Variable('z'), Number(_variables['z']!));
+    _contextModel.bindVariable(Variable('e'), Number(math.e));
+    _contextModel.bindVariable(Variable('pi'), Number(math.pi));
+  }
+
+  // Handle special function processing
+  String _processFunctions(String expr) {
+    // Handle logarithms
+    expr = expr.replaceAllMapped(
+      RegExp(r'log\(([^,)]+),\s*([^)]+)\)'),
+          (match) => '(log(${match.group(1)})/log(${match.group(2)}))',
+    );
+
+    // Handle mod operator
+    expr = expr.replaceAll('mod', '%');
+
+    return expr;
   }
 
   void _evaluateExpression() {
     try {
-      final processedExpr = _preprocessExpression(_expression);
+      String processedExpr = _preprocessExpression(_expression);
+      processedExpr = _processFunctions(processedExpr);
       final exp = _parser.parse(processedExpr);
       _bindVariables();
 
@@ -79,7 +118,8 @@ class ScreenState extends State<Screen> {
 
   void _assignToVariable(String variable) {
     try {
-      final processedExpr = _preprocessExpression(_expression);
+      String processedExpr = _preprocessExpression(_expression);
+      processedExpr = _processFunctions(processedExpr);
       final exp = _parser.parse(processedExpr);
 
       // Bind current variable values before evaluation
@@ -117,17 +157,15 @@ class ScreenState extends State<Screen> {
     );
   }
 
-  Widget _buildRow(List<String> labels, {List<Color>? colors}) => Row(
-    children: List.generate(
-      labels.length, (i) => _buildButton(labels[i], color: colors != null ? colors[i] : Colors.grey),
-    ),
-  );
+  Widget _buildRow(List<String> labels, {List<Color>? colors}) => Row(children: List.generate(labels.length, (i) => _buildButton(labels[i], color: colors![i])));
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Advanced Calculator')),
-      body: Column(
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Advanced Calculator', style: TextStyle(color: Colors.white)), backgroundColor: ch),
+    backgroundColor: Colors.grey,
+    body: SingleChildScrollView(
+      scrollDirection: Axis.vertical,
+      child: Column(
         children: [
           Container(
             alignment: Alignment.centerRight,
@@ -143,12 +181,15 @@ class ScreenState extends State<Screen> {
           _buildRow(['7', '8', '9', '÷'], colors: [ch, ch, ch, Colors.orange]),
           _buildRow(['4', '5', '6', '×'], colors: [ch, ch, ch, Colors.orange]),
           _buildRow(['1', '2', '3', '-'], colors: [ch, ch, ch, Colors.orange]),
-          _buildRow(['0', '.', '%', '+'], colors: [ch, ch, ch, Colors.orange]),
-          _buildRow(['C', 'CE', '=', '→x'], colors: [Colors.redAccent, Colors.pink.shade300, Colors.green, Colors.blue]),
+          _buildRow(['0', '.', '%', '+'], colors: [ch, ch, Colors.purple, Colors.orange]),
+          _buildRow(['C', 'CE', '=', '→x'], colors: [Colors.red, Colors.red, Colors.green, Colors.blue]),
           _buildRow(['x', 'y', 'z', '→y'], colors: [Colors.teal, Colors.teal, Colors.teal, Colors.blue]),
           _buildRow(['(', ')', '^', '→z'], colors: [ch, ch, ch, Colors.blue]),
+          _buildRow(['sin', 'cos', 'tan', 'mod'], colors: [Colors.indigo, Colors.indigo, Colors.indigo, Colors.brown]),
+          _buildRow(['log', 'ln', 'sqrt', 'π'], colors: [Colors.indigo, Colors.indigo, Colors.indigo, Colors.deepPurple]),
+          _buildRow(['e', 'log(', ',', ')'], colors: [Colors.deepPurple, Colors.indigo, ch, ch]),
         ],
       ),
-    );
-  }
+    ),
+  );
 }
