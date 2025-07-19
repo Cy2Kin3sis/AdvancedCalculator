@@ -31,6 +31,9 @@ class ScreenState extends State<Screen> {
     } else if (value == '→x' || value == '→y' || value == '→z') {
       final variable = value.substring(1); // Get 'x', 'y', or 'z'
       _assignToVariable(variable);
+    } else if (['sin', 'cos', 'tan', 'ln', 'sqrt', 'log', 'nrt'].contains(value)) {
+      // Automatically add space after functions for better formatting
+      _expression += '$value ';
     } else {
       _expression += value;
     }
@@ -42,19 +45,22 @@ class ScreenState extends State<Screen> {
     expr = expr.replaceAll('×', '*');
     expr = expr.replaceAll('÷', '/');
 
+    // Remove extra spaces around function names
+    expr = expr.replaceAll(RegExp(r'\s+'), ' ').trim();
+
     // Handle percentage conversion (e.g., "50%" becomes "50/100", "x%" becomes "x/100")
     expr = expr.replaceAllMapped(RegExp(r'([0-9.]+|[xyz])\s*%'), (match) => '(${match.group(1)}/100)');
 
-    // Handle implicit multiplication patterns
+    // Handle implicit multiplication patterns with improved regex
     // Pattern 1: number followed by variable (e.g., "4x", "2.5y")
     expr = expr.replaceAllMapped(
-      RegExp(r'(\d+\.?\d*)\s*([xyz])'),
+      RegExp(r'(\d+(?:\.\d+)?)\s*([xyz])(?![a-zA-Z])'),
           (match) => '${match.group(1)}*${match.group(2)}',
     );
 
     // Pattern 2: variable followed by number (e.g., "x4", "y2.5")
     expr = expr.replaceAllMapped(
-      RegExp(r'([xyz])\s*(\d+\.?\d*)'),
+      RegExp(r'([xyz])\s*(\d+(?:\.\d+)?)'),
           (match) => '${match.group(1)}*${match.group(2)}',
     );
 
@@ -64,15 +70,15 @@ class ScreenState extends State<Screen> {
           (match) => '${match.group(1)}*${match.group(2)}',
     );
 
-    // Pattern 4: number/variable followed by opening parenthesis
+    // Pattern 4: number/variable followed by opening parenthesis (avoid function names)
     expr = expr.replaceAllMapped(
-      RegExp(r'(\d+\.?\d*|[xyz])\s*\('),
+      RegExp(r'(\d+(?:\.\d+)?|[xyz])(?!\s*(?:sin|cos|tan|log|ln|sqrt|nrt))\s*\('),
           (match) => '${match.group(1)}*(',
     );
 
     // Pattern 5: closing parenthesis followed by number/variable
     expr = expr.replaceAllMapped(
-      RegExp(r'\)\s*(\d+\.?\d*|[xyz])'),
+      RegExp(r'\)\s*(\d+(?:\.\d+)?|[xyz])'),
           (match) => ')*${match.group(1)}',
     );
 
@@ -90,10 +96,22 @@ class ScreenState extends State<Screen> {
 
   // Handle special function processing
   String _processFunctions(String expr) {
-    // Handle logarithms
+    // Handle nth root: nrt(n,x) becomes x^(1/n)
     expr = expr.replaceAllMapped(
-      RegExp(r'log\(([^,)]+),\s*([^)]+)\)'),
+      RegExp(r'nrt\s*\(\s*([^,)]+)\s*,\s*([^)]+)\s*\)'),
+          (match) => 'pow(${match.group(2)}, 1/${match.group(1)})',
+    );
+
+    // Handle custom base logarithms: log(x,base) becomes log(x)/log(base)
+    expr = expr.replaceAllMapped(
+      RegExp(r'log\s*\(\s*([^,)]+)\s*,\s*([^)]+)\s*\)'),
           (match) => '(log(${match.group(1)})/log(${match.group(2)}))',
+    );
+
+    // Handle standard square root with proper function name
+    expr = expr.replaceAllMapped(
+      RegExp(r'sqrt\s*\(\s*([^)]+)\s*\)'),
+          (match) => 'sqrt(${match.group(1)})',
     );
 
     // Handle mod operator
@@ -157,39 +175,58 @@ class ScreenState extends State<Screen> {
     );
   }
 
-  Widget _buildRow(List<String> labels, {List<Color>? colors}) => Row(children: List.generate(labels.length, (i) => _buildButton(labels[i], color: colors![i])));
+  Widget _buildRow(List<String> labels, {List<Color>? colors}) => Row(
+      children: List.generate(labels.length, (i) => _buildButton(labels[i], color: colors![i]))
+  );
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Advanced Calculator', style: TextStyle(color: Colors.white)), backgroundColor: ch),
+    appBar: AppBar(
+        title: const Text('Advanced Calculator', style: TextStyle(color: Colors.white)),
+        backgroundColor: ch
+    ),
     backgroundColor: Colors.grey,
-    body: SingleChildScrollView(
-      scrollDirection: Axis.vertical,
-      child: Column(
-        children: [
-          Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(_expression, style: const TextStyle(fontSize: 28)),
+    body: Column(
+      children: [
+        // Fixed display area that stays visible when scrolling
+        Container(
+          color: Colors.grey[100],
+          child: Column(
+            children: [
+              Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(_expression, style: const TextStyle(fontSize: 28)),
+              ),
+              Container(
+                alignment: Alignment.centerRight,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Text(_result, style: const TextStyle(fontSize: 22, color: Colors.blueGrey)),
+              ),
+              const Divider(),
+            ],
           ),
-          Container(
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Text(_result, style: const TextStyle(fontSize: 22, color: Colors.blueGrey)),
+        ),
+        // Scrollable button area
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _buildRow(['7', '8', '9', '÷'], colors: [ch, ch, ch, Colors.orange]),
+                _buildRow(['4', '5', '6', '×'], colors: [ch, ch, ch, Colors.orange]),
+                _buildRow(['1', '2', '3', '-'], colors: [ch, ch, ch, Colors.orange]),
+                _buildRow(['0', '.', '%', '+'], colors: [ch, ch, Colors.purple, Colors.orange]),
+                _buildRow(['C', 'CE', '=', '→x'], colors: [Colors.red, Colors.red, Colors.green, Colors.blue]),
+                _buildRow(['x', 'y', 'z', '→y'], colors: [Colors.teal, Colors.teal, Colors.teal, Colors.blue]),
+                _buildRow(['(', ')', '^', '→z'], colors: [ch, ch, ch, Colors.blue]),
+                _buildRow(['sin', 'cos', 'tan', 'mod'], colors: [Colors.indigo, Colors.indigo, Colors.indigo, Colors.brown]),
+                _buildRow(['log', 'ln', 'sqrt', 'nrt'], colors: [Colors.indigo, Colors.indigo, Colors.indigo, Colors.deepOrange]),
+                _buildRow(['e', 'π', ',', 'log('], colors: [Colors.deepPurple, Colors.deepPurple, ch, Colors.indigo]),
+              ],
+            ),
           ),
-          const Divider(),
-          _buildRow(['7', '8', '9', '÷'], colors: [ch, ch, ch, Colors.orange]),
-          _buildRow(['4', '5', '6', '×'], colors: [ch, ch, ch, Colors.orange]),
-          _buildRow(['1', '2', '3', '-'], colors: [ch, ch, ch, Colors.orange]),
-          _buildRow(['0', '.', '%', '+'], colors: [ch, ch, Colors.purple, Colors.orange]),
-          _buildRow(['C', 'CE', '=', '→x'], colors: [Colors.red, Colors.red, Colors.green, Colors.blue]),
-          _buildRow(['x', 'y', 'z', '→y'], colors: [Colors.teal, Colors.teal, Colors.teal, Colors.blue]),
-          _buildRow(['(', ')', '^', '→z'], colors: [ch, ch, ch, Colors.blue]),
-          _buildRow(['sin', 'cos', 'tan', 'mod'], colors: [Colors.indigo, Colors.indigo, Colors.indigo, Colors.brown]),
-          _buildRow(['log', 'ln', 'sqrt', 'π'], colors: [Colors.indigo, Colors.indigo, Colors.indigo, Colors.deepPurple]),
-          _buildRow(['e', 'log(', ',', ')'], colors: [Colors.deepPurple, Colors.indigo, ch, ch]),
-        ],
-      ),
+        ),
+      ],
     ),
   );
 }
