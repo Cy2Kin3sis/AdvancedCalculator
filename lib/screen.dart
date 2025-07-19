@@ -33,13 +33,40 @@ class ScreenState extends State<Screen> {
       _assignToVariable(variable);
     } else if (['sin', 'cos', 'tan', 'ln', 'sqrt', 'log', 'nrt'].contains(value)) {
       // Automatically add space after functions for better formatting
-      _expression += '$value ';
+      _expression += value + ' ';
+    } else if (value == '.') {
+      // Validate decimal point input to prevent multiple decimals in one number
+      if (_canAddDecimal()) {
+        _expression += value;
+      }
     } else {
       _expression += value;
     }
   });
 
-  // Add this method to preprocess expressions for implicit multiplication
+  // Validate if a decimal point can be added to prevent multiple decimals in one number
+  bool _canAddDecimal() {
+    if (_expression.isEmpty) return true;
+
+    // Find the current number being typed (from the end of expression)
+    // Look for the last occurrence of operators, spaces, or parentheses
+    final operatorPattern = RegExp(r'[+\-×÷*/()^%,\s]');
+    int lastOperatorIndex = -1;
+
+    // Find the last operator position
+    for (int i = _expression.length - 1; i >= 0; i--) {
+      if (operatorPattern.hasMatch(_expression[i])) {
+        lastOperatorIndex = i;
+        break;
+      }
+    }
+
+    // Extract the current number being typed
+    String currentNumber = _expression.substring(lastOperatorIndex + 1);
+
+    // Check if current number already contains a decimal point
+    return !currentNumber.contains('.');
+  }
   String _preprocessExpression(String expr) {
     // Replace display symbols with parser-compatible ones
     expr = expr.replaceAll('×', '*');
